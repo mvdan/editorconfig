@@ -179,9 +179,13 @@ func (f *File) Filter(name string) Section {
 	return result
 }
 
-// Find is equivalent to Query{}.Find.
+// Find figures out the properties that apply to a file name on disk, and
+// returns them as a section. The name doesn't need to be an absolute path.
+//
+// It is equivalent to Query{}.Find; please note that no caching at all takes
+// place in this mode.
 func Find(name string) (Section, error) {
-	return (&Query{}).Find(name)
+	return Query{}.Find(name)
 }
 
 // Query allows fine-grained control of how EditorConfig files are found and
@@ -210,7 +214,7 @@ type Query struct {
 // files can be cached in Query.
 //
 // The defaults for supported properties are applied before returning.
-func (q *Query) Find(name string) (Section, error) {
+func (q Query) Find(name string) (Section, error) {
 	name, err := filepath.Abs(name)
 	if err != nil {
 		return Section{}, err

@@ -30,7 +30,7 @@ type File struct {
 // properties to the filenames matching it.
 type Section struct {
 	// Name is the section's name. Usually, this will be a valid pattern
-	// matching string.
+	// matching string, such as "[*.go]".
 	Name   string
 	rxName *regexp.Regexp
 
@@ -40,7 +40,7 @@ type Section struct {
 }
 
 // Property is a single property with a name and a value, which can be
-// represented as a single line.
+// represented as a single line like "indent_size=8".
 type Property struct {
 	// Name is always lowercase and allows identifying a property.
 	Name string

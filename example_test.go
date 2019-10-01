@@ -11,16 +11,16 @@ import (
 )
 
 func Example() {
-	result, err := editorconfig.Find("_sample/subdir/code.go")
+	props, err := editorconfig.Find("_sample/subdir/code.go")
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(result)
+	fmt.Println(props)
 
-	fmt.Println(result.Get("indent_style"))
-	fmt.Println(result.IndentSize())
-	fmt.Println(result.TrimTrailingWhitespace())
-	fmt.Println(result.InsertFinalNewline())
+	fmt.Println(props.Get("indent_style"))
+	fmt.Println(props.IndentSize())
+	fmt.Println(props.TrimTrailingWhitespace())
+	fmt.Println(props.InsertFinalNewline())
 
 	// Output:
 	// indent_style=tab
@@ -46,7 +46,10 @@ insert_final_newline = true
 indent_style = tab
 indent_size = 8
 `
-	file, _ := editorconfig.Parse(strings.NewReader(config))
+	file, err := editorconfig.Parse(strings.NewReader(config))
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println(file)
 
 	// Output:
@@ -69,7 +72,10 @@ end_of_line = lf
 [*.go]
 indent_style = tab
 `
-	file, _ := editorconfig.Parse(strings.NewReader(config))
+	file, err := editorconfig.Parse(strings.NewReader(config))
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println(file.Filter("main.go"))
 
 	// Output:

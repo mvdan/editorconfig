@@ -35,7 +35,7 @@ type Section struct {
 	rxName *regexp.Regexp
 
 	// Properties is the list of name-value properties contained by a
-	// section.
+	// section. It is kept in increasing order, to allow binary searches.
 	Properties []Property
 }
 
@@ -73,7 +73,7 @@ func (f File) String() string {
 // it, or nil if no such property exists.
 //
 // Note that most of the time, Get should be used instead.
-func (s *Section) Lookup(name string) *Property {
+func (s Section) Lookup(name string) *Property {
 	// TODO: binary search
 	for i, prop := range s.Properties {
 		if prop.Name == name {
@@ -85,7 +85,7 @@ func (s *Section) Lookup(name string) *Property {
 
 // Get returns the value of a property found by its name. If no such property
 // exists, an empty string is returned.
-func (s *Section) Get(name string) string {
+func (s Section) Get(name string) string {
 	if prop := s.Lookup(name); prop != nil {
 		return prop.Value
 	}
@@ -93,24 +93,24 @@ func (s *Section) Get(name string) string {
 }
 
 // IndentSize is a shortcut for Get("indent_size") as an int.
-func (s *Section) IndentSize() int {
+func (s Section) IndentSize() int {
 	n, _ := strconv.Atoi(s.Get("indent_size"))
 	return n
 }
 
 // IndentSize is a shortcut for Get("trim_trailing_whitespace") as a bool.
-func (s *Section) TrimTrailingWhitespace() bool {
+func (s Section) TrimTrailingWhitespace() bool {
 	return s.Get("trim_trailing_whitespace") == "true"
 }
 
 // IndentSize is a shortcut for Get("insert_final_newline") as a bool.
-func (s *Section) InsertFinalNewline() bool {
+func (s Section) InsertFinalNewline() bool {
 	return s.Get("insert_final_newline") == "true"
 }
 
 // IndentSize is similar to Get("indent_size"), but it handles the "tab" default
 // and returns an int. When unset, it returns 0.
-func (s *Section) TabWidth() int {
+func (s Section) TabWidth() int {
 	value := s.Get("indent_size")
 	if value == "tab" {
 		value = s.Get("tab_width")
@@ -180,7 +180,7 @@ func (f *File) Filter(name string) Section {
 }
 
 // Find is equivalent to Query{}.Find.
-func Find(name string) (*Section, error) {
+func Find(name string) (Section, error) {
 	return (&Query{}).Find(name)
 }
 
@@ -210,17 +210,17 @@ type Query struct {
 // files can be cached in Query.
 //
 // The defaults for supported properties are applied before returning.
-func (q *Query) Find(name string) (*Section, error) {
+func (q *Query) Find(name string) (Section, error) {
 	name, err := filepath.Abs(name)
 	if err != nil {
-		return nil, err
+		return Section{}, err
 	}
 	configName := q.ConfigName
 	if configName == "" {
 		configName = DefaultName
 	}
 
-	result := &Section{}
+	result := Section{}
 	dir := name
 	for {
 		if d := filepath.Dir(dir); d != dir {
@@ -232,15 +232,16 @@ func (q *Query) Find(name string) (*Section, error) {
 		if !e {
 			f, err := os.Open(filepath.Join(dir, configName))
 			if os.IsNotExist(err) {
-				// continue below
+				// continue below, caching the nil file
 			} else if err != nil {
-				return nil, err
+				return Section{}, err
 			} else {
-				file, err = Parse(f)
+				file_, err := Parse(f)
 				f.Close()
 				if err != nil {
-					return nil, err
+					return Section{}, err
 				}
+				file = &file_
 			}
 			if q.Cache != nil {
 				q.Cache[dir] = file
@@ -277,8 +278,8 @@ func (q *Query) Find(name string) (*Section, error) {
 	return result, nil
 }
 
-func Parse(r io.Reader) (*File, error) {
-	f := &File{}
+func Parse(r io.Reader) (File, error) {
+	f := File{}
 	scanner := bufio.NewScanner(r)
 	var section *Section
 	for scanner.Scan() {
@@ -314,12 +315,10 @@ func Parse(r io.Reader) (*File, error) {
 		if len(key) > 50 || len(value) > 255 {
 			continue
 		}
-		if section == nil {
-			if key == "root" {
-				f.Root = value == "true"
-			}
-		} else {
+		if section != nil {
 			section.Add(Property{Name: key, Value: value})
+		} else if key == "root" {
+			f.Root = value == "true"
 		}
 	}
 	return f, nil

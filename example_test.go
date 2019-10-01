@@ -16,6 +16,7 @@ func Example() {
 		panic(err)
 	}
 	fmt.Println(result)
+
 	fmt.Println(result.Get("indent_style"))
 	fmt.Println(result.IndentSize())
 	fmt.Println(result.TrimTrailingWhitespace())

@@ -15,8 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"mvdan.cc/sh/v3/pattern"
 )
 
 const DefaultName = ".editorconfig"
@@ -159,7 +157,7 @@ func (s *Section) Match(name string) bool {
 		} else if i < 0 {
 			pat = "**/" + pat
 		}
-		rx, err := pattern.Regexp(pat, pattern.Filenames|pattern.Braces)
+		rx, err := patternRegexp(pat, patternFilenames|patternBraces)
 		if err != nil {
 			panic(err)
 		}

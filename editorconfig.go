@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"mvdan.cc/sh/v3/pattern"
 )
@@ -31,8 +32,10 @@ type File struct {
 type Section struct {
 	// Name is the section's name. Usually, this will be a valid pattern
 	// matching string, such as "[*.go]".
-	Name   string
-	rxName *regexp.Regexp
+	Name string
+
+	rxNameMu sync.Mutex
+	rxName   *regexp.Regexp
 
 	// Properties is the list of name-value properties contained by a
 	// section. It is kept in increasing order, to allow binary searches.
@@ -145,8 +148,10 @@ func (s Section) String() string {
 // should be a path relative to the directory holding the EditorConfig.
 //
 // The underyling regular expression is built on first use and cached for later
-// use.
+// use. The method is still safe for concurrent use.
 func (s *Section) Match(name string) bool {
+	s.rxNameMu.Lock()
+	defer s.rxNameMu.Unlock()
 	if s.rxName == nil {
 		pat := s.Name
 		if i := strings.IndexByte(pat, '/'); i == 0 {

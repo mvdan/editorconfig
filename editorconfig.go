@@ -265,21 +265,21 @@ func (q Query) Find(name string) (Section, error) {
 	}
 
 	if result.Get("indent_style") == "tab" {
-		if prop := result.Lookup("tab_width"); prop != nil {
+		if value := result.Get("tab_width"); value != "" {
 			// When indent_style is "tab" and tab_width is set,
 			// indent_size should default to tab_width.
-			result.Add(Property{Name: "indent_size", Value: prop.Value})
+			result.Add(Property{Name: "indent_size", Value: value})
 		}
 		if q.Version != "" && q.Version < "0.9.0" {
-		} else if result.Lookup("indent_size") == nil {
+		} else if result.Get("indent_size") == "" {
 			// When indent_style is "tab", indent_size defaults to
 			// "tab". Only on 0.9.0 and later.
 			result.Add(Property{Name: "indent_size", Value: "tab"})
 		}
-	} else if result.Lookup("tab_width") == nil {
-		if prop := result.Lookup("indent_size"); prop != nil && prop.Value != "tab" {
+	} else if result.Get("tab_width") == "" {
+		if value := result.Get("indent_size"); value != "" && value != "tab" {
 			// tab_width defaults to the value of indent_size.
-			result.Add(Property{Name: "tab_width", Value: prop.Value})
+			result.Add(Property{Name: "tab_width", Value: value})
 		}
 	}
 	return result, nil

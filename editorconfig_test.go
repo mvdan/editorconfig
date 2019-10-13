@@ -39,6 +39,10 @@ func TestViaCmake(t *testing.T) {
 	os.Setenv("EDITORCONFIG_CMD", os.Args[0])
 	mustRun(t, "core-test", "cmake", "..")
 
+	// Run with a high number of parallel jobs, as we have a lot of test
+	// cases to run, and the test binary lags with -race.
+	// out, err := run("core-test", "ctest", "-j64")
+	os.Setenv("GORACE", "atexit_sleep_ms=10ms")
 	out, err := run("core-test", "ctest")
 	if err != nil {
 		rxFailed := regexp.MustCompile(` - ([a-zA-Z0-9_]+) \((.*)\)`)

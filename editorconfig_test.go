@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sync"
 	"testing"
 )
 
@@ -39,10 +40,10 @@ func TestViaCmake(t *testing.T) {
 	os.Setenv("EDITORCONFIG_CMD", os.Args[0])
 	mustRun(t, "core-test", "cmake", "..")
 
-	// Run with a high number of parallel jobs, as we have a lot of test
-	// cases to run, and the test binary lags with -race.
+	// Run with a high number of parallel jobs, and with a reduced sleep
+	// before exit when using -race, as we have a lot of test cases to run.
 	os.Setenv("GORACE", "atexit_sleep_ms=10")
-	out, err := run("core-test", "ctest")
+	out, err := run("core-test", "ctest", "-j8")
 	if err != nil {
 		rxFailed := regexp.MustCompile(` - ([a-zA-Z0-9_]+) \((.*)\)`)
 		matches := rxFailed.FindAllStringSubmatch(out, -1)
@@ -57,4 +58,33 @@ func TestViaCmake(t *testing.T) {
 			t.Errorf("%s failed: %s", name, reason)
 		}
 	}
+}
+
+func TestConcurrentQuery(t *testing.T) {
+	q := Query{}
+	n := 100
+	name := "_sample/subdir/code.go"
+
+	many := func(fn func()) {
+		var wg sync.WaitGroup
+		wg.Add(n)
+		for i := 0; i < n; i++ {
+			go func() {
+				fn()
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+	}
+
+	many(func() {
+		section, err := q.Find(name)
+		if err != nil {
+			t.Error(err)
+		}
+		if exp, got := 4, len(section.Properties); exp != got {
+			t.Errorf("wanted %d properties, got %d", exp, got)
+		}
+		_ = section.String()
+	})
 }

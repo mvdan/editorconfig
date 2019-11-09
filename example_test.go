@@ -76,7 +76,7 @@ indent_style = tab
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(file.Filter("main.go"))
+	fmt.Println(file.Filter("main.go", nil))
 
 	// Output:
 	// indent_style=tab

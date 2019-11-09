@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 const DefaultName = ".editorconfig"
@@ -31,9 +30,6 @@ type Section struct {
 	// Name is the section's name. Usually, this will be a valid pattern
 	// matching string, such as "[*.go]".
 	Name string
-
-	rxNameMu sync.Mutex
-	rxName   *regexp.Regexp
 
 	// Properties is the list of name-value properties contained by a
 	// section. It is kept in increasing order, to allow binary searches.
@@ -53,7 +49,7 @@ type Property struct {
 func (p Property) String() string { return fmt.Sprintf("%s=%s", p.Name, p.Value) }
 
 // String turns a file into its INI format.
-func (f File) String() string {
+func (f *File) String() string {
 	var b strings.Builder
 	if f.Root {
 		fmt.Fprintf(&b, "root=true\n\n")
@@ -142,40 +138,27 @@ func (s Section) String() string {
 	return b.String()
 }
 
-// Match returns whether a file name matches the section's pattern. The name
-// should be a path relative to the directory holding the EditorConfig.
-//
-// The underyling regular expression is built on first use and cached for later
-// use. The method is still safe for concurrent use.
-func (s *Section) Match(name string) bool {
-	s.rxNameMu.Lock()
-	defer s.rxNameMu.Unlock()
-	if s.rxName == nil {
-		pat := s.Name
-		if i := strings.IndexByte(pat, '/'); i == 0 {
-			pat = pat[1:]
-		} else if i < 0 {
-			pat = "**/" + pat
-		}
-		rx, err := patternRegexp(pat, patternFilenames|patternBraces)
-		if err != nil {
-			panic(err)
-		}
-		s.rxName = regexp.MustCompile("^" + rx + "$")
-	}
-	return s.rxName.MatchString(name)
-}
-
 // Filter returns a set of properties from a file that apply to a file name.
 // Properties from later sections take precedence. The name should be a path
 // relative to the directory holding the EditorConfig.
 //
+// If cache is non-nil, the map will be used to reuse patterns translated and
+// compiled to regular expressions.
+//
 // Note that this function doesn't apply defaults; for that, see Find.
-func (f *File) Filter(name string) Section {
+func (f *File) Filter(name string, cache map[string]*regexp.Regexp) Section {
 	result := Section{}
 	for i := len(f.Sections) - 1; i >= 0; i-- {
 		section := f.Sections[i]
-		if section.Match(name) {
+
+		rx := cache[section.Name]
+		if rx == nil {
+			rx = toRegexp(section.Name)
+			if cache != nil {
+				cache[section.Name] = rx
+			}
+		}
+		if rx.MatchString(name) {
 			result.Add(section.Properties...)
 		}
 	}
@@ -192,17 +175,26 @@ func Find(name string) (Section, error) {
 }
 
 // Query allows fine-grained control of how EditorConfig files are found and
-// used.
+// used. It also attempts to cache and reuse work, which makes its Find method
+// significantly faster when used on many files.
 type Query struct {
 	// ConfigName specifies what EditorConfig file name to use when
 	// searching for files on disk. If empty, it defaults to DefaultName.
 	ConfigName string
 
-	// Cache keeps track of which directories are known to contain an
-	// EditorConfig.
+	// FileCache keeps track of which directories are known to contain an
+	// EditorConfig. Existing entries which are nil mean that the directory
+	// is known to not contain an EditorConfig.
 	//
 	// If nil, no caching takes place.
-	Cache map[string]*File
+	FileCache map[string]*File
+
+	// RegexpCache keeps track of patterns which have already been
+	// translated to a regular expression and compiled, to save repeating
+	// the work.
+	//
+	// If nil, no caching takes place.
+	RegexpCache map[string]*regexp.Regexp
 
 	// Version specifies an EditorConfig version to use when applying its
 	// spec. When empty, it defaults to the latest version. This field
@@ -235,7 +227,7 @@ func (q Query) Find(name string) (Section, error) {
 		} else {
 			break
 		}
-		file, e := q.Cache[dir]
+		file, e := q.FileCache[dir]
 		if !e {
 			f, err := os.Open(filepath.Join(dir, configName))
 			if os.IsNotExist(err) {
@@ -243,22 +235,22 @@ func (q Query) Find(name string) (Section, error) {
 			} else if err != nil {
 				return Section{}, err
 			} else {
-				file_, err := Parse(f)
+				var err error
+				file, err = Parse(f)
 				f.Close()
 				if err != nil {
 					return Section{}, err
 				}
-				file = &file_
 			}
-			if q.Cache != nil {
-				q.Cache[dir] = file
+			if q.FileCache != nil {
+				q.FileCache[dir] = file
 			}
 		}
 		if file == nil {
 			continue
 		}
 		relative := name[len(dir)+1:]
-		result.Add(file.Filter(relative).Properties...)
+		result.Add(file.Filter(relative, q.RegexpCache).Properties...)
 		if file.Root {
 			break
 		}
@@ -285,8 +277,21 @@ func (q Query) Find(name string) (Section, error) {
 	return result, nil
 }
 
-func Parse(r io.Reader) (File, error) {
-	f := File{}
+func toRegexp(pat string) *regexp.Regexp {
+	if i := strings.IndexByte(pat, '/'); i == 0 {
+		pat = pat[1:]
+	} else if i < 0 {
+		pat = "**/" + pat
+	}
+	rxStr, err := patternRegexp(pat, patternFilenames|patternBraces)
+	if err != nil {
+		panic(err)
+	}
+	return regexp.MustCompile("^" + rxStr + "$")
+}
+
+func Parse(r io.Reader) (*File, error) {
+	f := &File{}
 	scanner := bufio.NewScanner(r)
 	var section *Section
 	for scanner.Scan() {

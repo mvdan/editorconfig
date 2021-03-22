@@ -1,7 +1,7 @@
 // Copyright (c) 2019, Daniel Martí <mvdan@mvdan.cc>
 // See LICENSE for licensing information
 
-// Pakage editorconfig allows parsing and using EditorConfig files, as defined
+// Package editorconfig allows parsing and using EditorConfig files, as defined
 // in https://editorconfig.org/.
 package editorconfig
 

@@ -28,7 +28,7 @@ type File struct {
 // properties to the filenames matching it.
 type Section struct {
 	// Name is the section's name. Usually, this will be a valid pattern
-	// matching string, such as "[*.go]".
+	// matching string, such as "[*.go]", without the square brackets.
 	Name string
 
 	// Properties is the list of name-value properties contained by a
@@ -281,17 +281,23 @@ func (q Query) Find(name string) (Section, error) {
 	return result, nil
 }
 
+// Bundle mvdan.cc/sh/v3/pattern into pattern_bundle.go,
+// since mvdan.cc/sh/v3/cmd/shfmt depends on this module
+// and we don't want to end up with circular module dependencies.
+// This should be fine, as the package is small, and the toolchain can omit what is unused.
+// Note that we can't use @version on the sh/v3 module, so we automatically pull @latest via go.mod.
+
 func toRegexp(pat string) *regexp.Regexp {
 	if i := strings.IndexByte(pat, '/'); i == 0 {
 		pat = pat[1:]
 	} else if i < 0 {
 		pat = "**/" + pat
 	}
-	rxStr, err := patternRegexp(pat, patternFilenames|patternBraces)
+	rxStr, err := patternRegexp(pat, patternFilenames|patternBraces|patternEntireString)
 	if err != nil {
 		panic(err)
 	}
-	return regexp.MustCompile("^" + rxStr + "$")
+	return regexp.MustCompile(rxStr)
 }
 
 func Parse(r io.Reader) (*File, error) {

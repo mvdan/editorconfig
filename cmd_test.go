@@ -32,7 +32,7 @@ func cmd() {
 		Version:    *emulateVersion,
 	}
 	for _, arg := range args {
-		result, err := query.Find(arg)
+		result, err := query.Find(arg, nil)
 		if err != nil {
 			log.Fatal(err)
 		}

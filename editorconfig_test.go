@@ -78,7 +78,7 @@ func TestConcurrentQuery(t *testing.T) {
 	}
 
 	many(func() {
-		section, err := q.Find(name)
+		section, err := q.Find(name, nil)
 		if err != nil {
 			t.Error(err)
 		}

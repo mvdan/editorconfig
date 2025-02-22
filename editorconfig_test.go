@@ -68,7 +68,7 @@ func TestConcurrentQuery(t *testing.T) {
 	many := func(fn func()) {
 		var wg sync.WaitGroup
 		wg.Add(n)
-		for i := 0; i < n; i++ {
+		for range n {
 			go func() {
 				fn()
 				wg.Done()

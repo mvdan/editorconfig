@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -163,11 +164,8 @@ func (f *File) Filter(name string, languages []string, cache map[string]*regexp.
 
 		if len(section.Name) > 2 && section.Name[0] == '[' && section.Name[len(section.Name)-1] == ']' {
 			sectionLang := section.Name[1 : len(section.Name)-1]
-			for _, language := range languages {
-				if language == sectionLang {
-					result.Add(section.Properties...)
-					break
-				}
+			if slices.Contains(languages, sectionLang) {
+				result.Add(section.Properties...)
 			}
 			continue
 		}

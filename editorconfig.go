@@ -159,9 +159,7 @@ func (s Section) String() string {
 func (f *File) Filter(name string, languages []string, cache map[string]*regexp.Regexp) Section {
 	name = filepath.ToSlash(name)
 	result := Section{}
-	for i := len(f.Sections) - 1; i >= 0; i-- {
-		section := f.Sections[i]
-
+	for _, section := range slices.Backward(f.Sections) {
 		if len(section.Name) > 2 && section.Name[0] == '[' && section.Name[len(section.Name)-1] == ']' {
 			sectionLang := section.Name[1 : len(section.Name)-1]
 			if slices.Contains(languages, sectionLang) {

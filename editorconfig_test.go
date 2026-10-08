@@ -43,7 +43,9 @@ func TestViaCmake(t *testing.T) {
 	// Run with a high number of parallel jobs, and with a reduced sleep
 	// before exit when using -race, as we have a lot of test cases to run.
 	os.Setenv("GORACE", "atexit_sleep_ms=10")
-	out, err := run("core-test", "ctest", "-j8")
+	// Multi-config generators like Visual Studio on Windows
+	// require a configuration, or all tests are "Not Run".
+	out, err := run("core-test", "ctest", "-j8", "-C", "Debug")
 	if err != nil {
 		rxFailed := regexp.MustCompile(` - ([a-zA-Z0-9_]+) \((.*)\)`)
 		matches := rxFailed.FindAllStringSubmatch(out, -1)
